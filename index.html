@@ -324,6 +324,34 @@ main .v19-zoom,.modalbox .v19-zoom{zoom:var(--v19zi,1)}
 .v19-zoomrow{display:flex;justify-content:flex-end;margin-bottom:10px}
 body.v19-big .v19q-grid{grid-template-columns:1fr}
 
+/* ---- Gestion des notions ---- */
+.v19-nl{display:flex;flex-direction:column;background:#fff;border-radius:16px;border:1px solid var(--line)}
+.v19-nr{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid #E7ECEA;flex-wrap:wrap}
+.v19-nr:first-child{border-top:none}
+.v19-nr .nm{flex:1 1 260px;font-weight:600}
+.v19-nr .ct{font-size:14px;color:var(--muted);min-width:64px;text-align:right}
+.v19-nr.ed input{flex:1 1 300px}
+.modal .v19-seg{display:inline-flex}
+
+/* ---- Réviser par chapitre ---- */
+.v19c .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.v19c .top h3{margin:0;font-size:21px}
+.v19c-list{display:flex;flex-direction:column}
+.v19c-row{display:flex;align-items:center;gap:14px;padding:12px 2px;border-top:1px solid #E7ECEA;flex-wrap:wrap}
+.v19c-row:first-child{border-top:none}
+.v19c-row .tx{flex:1 1 320px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.v19c-row .t{font-weight:700;font-size:17px}
+.v19c-row .s{font-size:14px;color:var(--muted)}
+.v19c-row .v19-trk{max-width:420px}
+.v19c-row .bt{display:flex;gap:8px;flex-shrink:0}
+
+.v19-subs{margin-top:6px}
+.v19-subs summary{cursor:pointer;font-size:14px;font-weight:700;color:var(--accent);min-height:32px;display:flex;align-items:center}
+.v19-sub{display:flex;align-items:center;gap:10px;padding:6px 0 6px 14px;border-left:3px solid var(--accent-soft);flex-wrap:wrap}
+.v19-sub .nm{flex:1 1 220px;font-size:15px}
+.v19-sub .ct{font-size:13px;color:var(--muted)}
+.v19-sub button{min-height:40px;padding:0 14px}
+
 </style></head><body>
 <header><b>🩺 QCM Médecine <span class="small" style="color:#9ca3af">v19</span></b>
 <nav>
@@ -5417,12 +5445,12 @@ function assignNotions(all){
 }
 window.reclassNotions=function(){
  const n=assignNotions(true);persist();refreshAll();
- alert(`${n} QCM reclassés automatiquement. Les notions choisies à la main n'ont pas été modifiées.`);
+ alert(`${n} QCM reclassés automatiquement. Les chapitres choisis à la main n'ont pas été modifiés.`);
 };
 window.setNotion=function(id,val){
  const q=findRecord(id);if(!q)return;
  if(val==='__auto'){q.notion=classify(q);q.notionAuto=true}
- else if(val==='__new'){const v=prompt('Nom de la nouvelle notion :',q.notion||'');if(!v||!v.trim())return openQ(id);q.notion=v.trim();q.notionAuto=false}
+ else if(val==='__new'){const v=prompt('Nom du nouveau chapitre :',q.notion||'');if(!v||!v.trim())return openQ(id);q.notion=v.trim();q.notionAuto=false}
  else{q.notion=val;q.notionAuto=false}
  persist();openQ(id);
 };
@@ -5499,7 +5527,7 @@ window.openCarnet=function(){
  const byUE={};for(const x of errs){const u=ueOf(x.q),n=notionOf(x.q);((byUE[u]=byUE[u]||{})[n]=byUE[u][n]||[]).push(x)}
  showModal(`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">📓 Carnet d'erreurs</h2><button class="secondary" onclick="closeModal()">Fermer</button></div>
  <p class="small">Chaque proposition que tu as mal jugée (cochée à tort ou oubliée) est notée ici. Elle sort du carnet quand tu la juges correctement deux fois de suite.</p>
- ${errs.length?`<button class="primary" onclick="closeModal();startErrorsSession()">🔁 Retravailler ces ${uniq(errs.map(x=>x.q.id)).length} QCM (mélangés par notion)</button>`:'<div class="success">Carnet vide : aucune erreur en attente.</div>'}
+ ${errs.length?`<button class="primary" onclick="closeModal();startErrorsSession()">🔁 Retravailler ces ${uniq(errs.map(x=>x.q.id)).length} QCM (mélangés par chapitre)</button>`:'<div class="success">Carnet vide : aucune erreur en attente.</div>'}
  ${Object.entries(byUE).map(([u,ns])=>`<h3 style="margin-top:14px">${esc(u)}</h3>`+Object.entries(ns).sort((a,b)=>b[1].length-a[1].length).map(([n,list])=>`<details style="margin:6px 0"><summary><b>${esc(n)}</b> <span class="badge b-danger">${list.length}</span></summary>
    ${list.map(x=>`<div class="anomaly" style="color:var(--text)"><span class="small">${esc((x.q.question||'').slice(0,90))}…</span><br><b>${x.l}.</b> ${esc(x.q.choices?.[x.l]||'')}<br>
    <span class="badge ${x.truth?'b-ok':'b-danger'}">Cette proposition est ${x.truth?'VRAIE':'FAUSSE'}</span> <span class="small">ratée ${x.e.n} fois, dernière le ${fmtDate(x.e.last)}</span>
@@ -5551,7 +5579,7 @@ window.startFlash=function(){
  const ue=document.getElementById('fcUE')?.value||'all',notion=document.getElementById('fcNotion')?.value||'all';
  const scope=document.getElementById('fcScope')?.value||'rec',len=Number(document.getElementById('fcLen')?.value||30);
  let pool=flashPool(ue,notion,scope);
- if(!pool.length){alert('Aucune affirmation pour ces critères. Essaie « Toutes les affirmations » ou une autre notion.');return}
+ if(!pool.length){alert('Aucune affirmation pour ces critères. Essaie « Toutes les affirmations » ou un autre chapitre.');return}
  const due=pool.filter(g=>{const p=progress[g.id];return !p||!p.due||p.due<=endOfToday()});
  const later=pool.filter(g=>!due.includes(g));
  pool=[...shuffle(due).sort((a,b)=>b.nQcm-a.nQcm),...later.sort((a,b)=>(progress[a.id].due||0)-(progress[b.id].due||0))];
@@ -5569,7 +5597,7 @@ function renderFlash(){
  if(session.revealed){
    const ok=session.pick===g.truth;
    fb=`<div class="${ok?'success':'anomaly'}"><b>${ok?'✅ Juste':'❌ Faux'}</b> — cette affirmation est <b>${g.truth?'VRAIE':'FAUSSE'}</b>.</div>
-   <p class="small">Tombée ${g.nQcm} fois (${g.years.map(esc).join(', ')}) · notion : ${esc(g.notion)}</p>
+   <p class="small">Tombée ${g.nQcm} fois (${g.years.map(esc).join(', ')}) · chapitre : ${esc(g.notion)}</p>
    <div style="display:flex;gap:8px;flex-wrap:wrap">
     ${g.occ.slice(0,4).map(x=>`<button class="secondary" onclick="openQ('${x.qid}')">Voir ${esc(x.qid)}</button>`).join('')}</div>
    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
@@ -5677,16 +5705,16 @@ window.renderReview=function(){
  const ueSel=document.getElementById('sessUE');if(!area||!ueSel||session)return;
  const mode=document.getElementById('sessMode');
  const nErr=uniq(openErrors().map(x=>x.q.id)).length;
- mode.insertAdjacentHTML('afterbegin',`<option value="target">🎯 Révision ciblée : notions prioritaires</option>`);
+ mode.insertAdjacentHTML('afterbegin',`<option value="target">🎯 Révision ciblée : chapitres prioritaires</option>`);
  mode.insertAdjacentHTML('beforeend',`<option value="errors">📓 Carnet d'erreurs (${nErr})</option>`);
  mode.value='due';
- ueSel.closest('label').insertAdjacentHTML('afterend',`<label>Notion<select id="sessNotion" style="width:100%"></select></label>`);
+ ueSel.closest('label').insertAdjacentHTML('afterend',`<label>Chapitre<select id="sessNotion" style="width:100%"></select></label>`);
  const ord=document.getElementById('sessOrder');
- ord.insertAdjacentHTML('beforeend','<option value="mix">🔀 Mélangé par notion (conseillé pour entretenir)</option>');
+ ord.insertAdjacentHTML('beforeend','<option value="mix">🔀 Mélangé par chapitre (conseillé pour entretenir)</option>');
  refreshNotionSelect();
  area.insertAdjacentHTML('afterbegin',priorityCard());
  const sessCard=area.querySelector('#sessMode').closest('.card');
- sessCard.insertAdjacentHTML('beforeend',`<p class="small">🎯 La révision ciblée prend les notions les plus rentables (tombent souvent, surtout ces dernières années, et que tu maîtrises le moins) et les mélange. Déclare « Sûr » ou « J'hésite » avant de valider : une réponse juste donnée en hésitant reste fragile.</p>
+ sessCard.insertAdjacentHTML('beforeend',`<p class="small">🎯 La révision ciblée prend les chapitres les plus rentables (tombent souvent, surtout ces dernières années, et que tu maîtrises le moins) et les mélange. Déclare « Sûr » ou « J'hésite » avant de valider : une réponse juste donnée en hésitant reste fragile.</p>
   <button class="secondary" onclick="openCarnet()">📓 Ouvrir le carnet d'erreurs (${openErrors().length} proposition(s))</button>`);
  sessCard.insertAdjacentHTML('afterend',flashCard());
  refreshFlashNotions();
@@ -5758,7 +5786,7 @@ function priorityCard(){
    <span class="small">tombée ${r.years}/${r.totalYears} années · maîtrise ${pct(r.mastery)} % · ${r.pool} QCM${r.gone?` · <span class="badge b-warn">plus tombée depuis ${r.last}</span>`:''}</span></span>
    <span class="n17track" style="flex:0 0 120px"><span style="width:${Math.min(100,pct(r.priority/(top[0].priority||1)))}%"></span></span>
    <button class="secondary" onclick="startNotionSession(${JSON.stringify(r.ue).replace(/"/g,'&quot;')},${JSON.stringify(r.name).replace(/"/g,'&quot;')})">▶️ Série</button></div>`).join('')||'<p class="small">Pas encore de données.</p>'}
-  <button class="primary" style="margin-top:8px" onclick="startTopMix(${JSON.stringify(ue).replace(/"/g,'&quot;')})">🔀 Série mélangée des notions prioritaires</button></div>`;
+  <button class="primary" style="margin-top:8px" onclick="startTopMix(${JSON.stringify(ue).replace(/"/g,'&quot;')})">🔀 Série mélangée des chapitres prioritaires</button></div>`;
 }
 function flashCard(){
  const ues=uniq(affIndex().all.map(g=>g.ue)).sort();
@@ -5769,7 +5797,7 @@ function flashCard(){
  <div class="editgrid">
   <label>UE<select id="fcUE" style="width:100%" onchange="refreshFlashNotions()"><option value="all">Toutes</option>${ues.map(u=>`<option>${esc(u)}</option>`).join('')}</select></label>
   <label>Affirmations<select id="fcScope" style="width:100%" onchange="refreshFlashNotions()"><option value="rec">Tombées plusieurs fois</option><option value="all">Toutes</option></select></label>
-  <label>Notion<select id="fcNotion" style="width:100%"></select></label>
+  <label>Chapitre<select id="fcNotion" style="width:100%"></select></label>
   <label>Longueur<select id="fcLen" style="width:100%"><option value="20">20</option><option value="30" selected>30</option><option value="50">50</option><option value="0">Tout</option></select></label>
  </div><button class="primary" onclick="startFlash()">▶️ Lancer les flashcards</button></div>`;
 }
@@ -5778,8 +5806,8 @@ function flashCard(){
 function weightedExamCard(){
  const s=settings();const b=s.bareme;
  const ues=uniq(db.records.filter(usable).map(ueOf)).sort();
- return `<div class="card"><h3>🏁 Concours blanc réaliste (tiré par notions)</h3>
- <p class="small">Les questions sont tirées dans toutes les annales de l'UE, en respectant la fréquence réelle de chaque notion aux examens. Les notions qui ne tombent plus pèsent moins.</p>
+ return `<div class="card"><h3>🏁 Concours blanc réaliste (tiré par chapitres)</h3>
+ <p class="small">Les questions sont tirées dans toutes les annales de l'UE, en respectant la fréquence réelle de chaque chapitre aux examens. Les chapitres qui ne tombent plus pèsent moins.</p>
  <div class="editgrid">
   <label>UE<select id="wxUE" style="width:100%">${ues.map(u=>`<option>${esc(u)}</option>`).join('')}</select></label>
   <label>Nombre de QCM<select id="wxN" style="width:100%"><option>20</option><option selected>30</option><option>45</option><option>60</option></select></label>
@@ -5846,7 +5874,7 @@ window.renderExamResult=function(){
  if(grid)grid.insertAdjacentHTML('beforeend',`<div class="stat"><strong>${(bm.pts/bm.max*20).toFixed(1)}/20</strong>note au barème (${bm.pts.toFixed(2)} pts)</div>`);
  const byN={};session.results.forEach(r=>{const q=findRecord(r.id);const n=q?notionOf(q):OTHER;byN[n]=byN[n]||{n:0,ok:0};byN[n].n++;if(r.correct)byN[n].ok++});
  const h=document.querySelector('#reviewArea h3');
- if(h)h.insertAdjacentHTML('beforebegin',`<h3 style="margin-top:12px">Par notion</h3>${Object.entries(byN).sort((a,b)=>a[1].ok/a[1].n-b[1].ok/b[1].n).map(([n,v])=>`<div class="bar"><span class="lab" style="min-width:0;flex:1">${esc(n)}</span><span class="n17track" style="flex:1"><span style="width:${Math.round(v.ok/v.n*100)}%"></span></span><span class="val">${v.ok}/${v.n}</span></div>`).join('')}`);
+ if(h)h.insertAdjacentHTML('beforebegin',`<h3 style="margin-top:12px">Par chapitre</h3>${Object.entries(byN).sort((a,b)=>a[1].ok/a[1].n-b[1].ok/b[1].n).map(([n,v])=>`<div class="bar"><span class="lab" style="min-width:0;flex:1">${esc(n)}</span><span class="n17track" style="flex:1"><span style="width:${Math.round(v.ok/v.n*100)}%"></span></span><span class="val">${v.ok}/${v.n}</span></div>`).join('')}`);
 };
 
 /* ---------- Statistiques : maîtrise par notion ---------- */
@@ -5858,9 +5886,9 @@ window.renderStats=function(){
  const rows=ue?notionTable(ue).slice().sort((a,b)=>b.recW-a.recW):[];
  const hist=[];for(const p of Object.values(progress))for(const h of (p.history||[]))if(h.conf)hist.push(h);
  const lucky=hist.filter(h=>h.correct&&h.conf==='doute').length,sure=hist.filter(h=>h.conf==='sur'),sureWrong=sure.filter(h=>!h.correct).length;
- area.insertAdjacentHTML('afterbegin',`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0">🧭 Maîtrise par notion</h3>
+ area.insertAdjacentHTML('afterbegin',`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0">🧭 Maîtrise par chapitre</h3>
  <select onchange="window.__statUE=this.value;renderStats()">${ues.map(u=>`<option${u===ue?' selected':''}>${esc(u)}</option>`).join('')}</select></div>
- <div style="overflow:auto;margin-top:8px"><table><thead><tr><th>Notion</th><th>Tombée</th><th>QCM</th><th>Vus</th><th>Réussite</th><th>Maîtrise</th><th></th></tr></thead><tbody>
+ <div style="overflow:auto;margin-top:8px"><table><thead><tr><th>Chapitre</th><th>Tombé</th><th>QCM</th><th>Vus</th><th>Réussite</th><th>Maîtrise</th><th></th></tr></thead><tbody>
  ${rows.map(r=>`<tr><td>${esc(r.name)}${r.gone?` <span class="badge b-warn">plus depuis ${r.last}</span>`:''}</td><td>${r.years}/${r.totalYears}</td><td>${r.pool}</td><td>${pct(r.coverage)} %</td><td>${r.success===null?'—':pct(r.success)+' %'}</td>
   <td style="min-width:110px"><span class="n17track"><span style="width:${pct(r.mastery)}%"></span></span></td>
   <td><button class="secondary" onclick="show('review');startNotionSession(${JSON.stringify(r.ue).replace(/"/g,'&quot;')},${JSON.stringify(r.name).replace(/"/g,'&quot;')})">▶️</button></td></tr>`).join('')}
@@ -5879,7 +5907,7 @@ window.renderControl=function(){
  <p class="small">La même proposition est notée vraie dans un corrigé et fausse dans un autre. Soit le contexte de la question change, soit un corrigé a été mal saisi (décalage de lettres, erreur d'OCR). Ces affirmations sont exclues des flashcards tant que ce n'est pas réglé.</p>
  ${con.length?`<details><summary>Afficher la liste</summary>${con.slice(0,200).map(g=>`<div class="anomaly" style="color:var(--text)"><b>${esc(g.text.slice(0,160))}</b><br>
    ${g.occ.map(o=>`<button class="secondary" style="margin:3px 3px 0 0" onclick="openQ('${o.qid}')">${esc(o.qid)} (${o.letter}) : ${o.truth?'vraie':'fausse'}</button>`).join('')}</div>`).join('')}</details>`:'<div class="success">Aucune contradiction.</div>'}
- <div style="margin-top:10px"><button class="secondary" onclick="reclassNotions()">🏷️ Reclasser automatiquement les notions</button> <span class="small">Ne touche pas aux notions choisies à la main.</span></div></div>`);
+ <div style="margin-top:10px"><button class="secondary" onclick="reclassNotions()">🏷️ Reclasser automatiquement les chapitres</button> <span class="small">Ne touche pas aux chapitres choisis à la main.</span></div></div>`);
 };
 
 /* ---------- Banque : filtre et badge de notion ---------- */
@@ -5888,7 +5916,7 @@ window.initFilters=function(){
  _initFilters.apply(this,arguments);
  const tb=document.querySelector('#bank .toolbar');if(!tb)return;
  let sel=document.getElementById('filterNotion');
- if(!sel){document.getElementById('filterUE').insertAdjacentHTML('afterend','<select id="filterNotion"><option value="all">Toutes les notions</option></select>');sel=document.getElementById('filterNotion');
+ if(!sel){document.getElementById('filterUE').insertAdjacentHTML('afterend','<select id="filterNotion"><option value="all">Tous les chapitres</option></select>');sel=document.getElementById('filterNotion');
    sel.onchange=()=>{window.__bankLimit=BANK_PAGE;renderBank()};
    const fu=document.getElementById('filterUE');const old=fu.onchange;fu.onchange=function(){fillBankNotions();if(old)old.apply(this,arguments)};}
  fillBankNotions();
@@ -5896,7 +5924,7 @@ window.initFilters=function(){
 function fillBankNotions(){
  const sel=document.getElementById('filterNotion');if(!sel)return;const ue=document.getElementById('filterUE')?.value||'all';
  const cur=sel.value;const list=notionsForUE(ue);
- sel.innerHTML='<option value="all">Toutes les notions</option>'+list.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+ sel.innerHTML='<option value="all">Tous les chapitres</option>'+list.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
  sel.value=list.includes(cur)?cur:'all';
 }
 const _bankRows=window.bankRows;
@@ -5922,9 +5950,9 @@ window.openQ=function(id){
  if(q&&mc){
    const list=notionsForUE(ueOf(q));if(!list.includes(notionOf(q)))list.push(notionOf(q));
    mc.insertAdjacentHTML('afterbegin',`<div class="warnbox" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#e8f0fe;border-color:#b7cdf5;color:var(--text)">
-    <b>🏷️ Notion</b><select onchange="setNotion('${q.id}',this.value)" style="flex:1;min-width:220px">
+    <b>🏷️ Chapitre</b><select onchange="setNotion('${q.id}',this.value)" style="flex:1;min-width:220px">
     ${list.map(n=>`<option value="${esc(n)}"${n===notionOf(q)?' selected':''}>${esc(n)}</option>`).join('')}
-    <option value="__new">➕ Nouvelle notion…</option><option value="__auto">↺ Classement automatique</option></select>
+    <option value="__new">➕ Nouveau chapitre…</option><option value="__auto">↺ Classement automatique</option></select>
     <span class="small">${q.notionAuto===false?'choisie à la main':'classée automatiquement'}</span></div>`);
  }
  return r;
@@ -5936,7 +5964,7 @@ window.persist=function(){for(const q of db.records)if(!q.notion){q.notion=class
 
 /* ---------- Démarrage ---------- */
 document.head.insertAdjacentHTML('beforeend','<style>.n17track{display:block;height:12px;background:#eef2f7;border-radius:999px;overflow:hidden}.n17track>span{display:block;height:100%;background:var(--blue)}.bar .fill{display:block}</style>');
-window.__v17={notionOf,notionTable,topNotions,openErrors,affIndex,usable,allUEs,qScore,startQueue};
+window.__v17={classify,notionOf,notionTable,topNotions,openErrors,affIndex,usable,allUEs,qScore,startQueue};
 const hdr=document.querySelector('header b .small');if(hdr)hdr.textContent='v17';
 window.bankReadyPromise.then(()=>{if(assignNotions(false))persist();refreshAll()});
 if(document.getElementById('review')?.classList.contains('active'))renderReview();
@@ -6086,10 +6114,10 @@ window.regenRef=function(){
  if(!confirm('Régénérer le référentiel à partir de la banque actuelle ?\n\nLes séries peuvent changer de contenu. Ta progression sur chaque QCM est conservée.'))return;
  ensureRef(true);renderRef();
 };
-const TYPES={rec2:['★','🔁 Tombés au moins 2 fois','Tous les QCM déjà tombés à au moins deux examens officiels (1re ou 2e chance ; examens blancs exclus), une seule version par question, la plus récente. Les plus fréquents en premier : c\'est la série prioritaire avant l\'examen.'],notion:['1','📗 Apprendre par notion','Une série par notion, les QCM les plus rentables en premier. Fais-les en mode révision, avec correction après chaque QCM.'],
+const TYPES={rec2:['★','🔁 Tombés au moins 2 fois','Tous les QCM déjà tombés à au moins deux examens officiels (1re ou 2e chance ; examens blancs exclus), une seule version par question, la plus récente. Les plus fréquents en premier : c\'est la série prioritaire avant l\'examen.'],notion:['1','📗 Apprendre par chapitre','Une série par chapitre, les QCM les plus rentables en premier. Fais-les en mode révision, avec correction après chaque QCM.'],
  top:['2','⭐ Consolider les incontournables','Les QCM déjà repris d\'une année sur l\'autre, ou dont plusieurs propositions reviennent. À revoir jusqu\'à ne plus faire d\'erreur.'],
- exam:['3','🏁 Examens blancs','Même nombre de QCM qu\'à l\'examen, notions au prorata de leur fréquence, aucune question commune entre deux examens. À passer chronométré.'],
- extra:['+','📦 Compléments','Notions rares ou qui ne tombent plus depuis au moins 3 ans. À garder pour la fin, après vérification de ton programme.']};
+ exam:['3','🏁 Examens blancs','Même nombre de QCM qu\'à l\'examen, chapitres au prorata de leur fréquence, aucune question commune entre deux examens. À passer chronométré.'],
+ extra:['+','📦 Compléments','Chapitres rares ou qui ne tombent plus depuis au moins 3 ans. À garder pour la fin, après vérification de ton programme.']};
 function seriesStats(s){
  const qs=s.qids.map(findRecord).filter(Boolean);
  let done=0,ok=0;
@@ -6138,7 +6166,7 @@ function renderRef(){
  const row=s=>{const x=seriesStats(s);const last=s.type==='exam'?exams.filter(e=>e.source===examLabel(s)).slice(-1)[0]:null;
    return `<div class="bar" style="flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--line)">
    <span style="flex:1 1 280px"><b>${esc(s.title)}</b>${x.mastered?' <span class="badge b-ok">maîtrisée</span>':''}<br>
-   <span class="small">${x.n} QCM${s.type==='rec2'?(s.meta.n3?` · dont ${s.meta.n3} tombés 3 fois ou plus`:''):s.meta.recurrent?` · ${s.meta.recurrent} repris d'une année à l'autre`:''}${s.meta.years?` · notion tombée ${s.meta.years}/${s.meta.totalYears} années`:''} · faits ${x.done}/${x.n}${x.done?` · ${Math.round(x.succ*100)} % justes à la dernière tentative`:''}${last?` · dernier passage ${last.score}/${last.n}${last.note20!=null?` (${last.note20}/20)`:''}`:''}</span></span>
+   <span class="small">${x.n} QCM${s.type==='rec2'?(s.meta.n3?` · dont ${s.meta.n3} tombés 3 fois ou plus`:''):s.meta.recurrent?` · ${s.meta.recurrent} repris d'une année à l'autre`:''}${s.meta.years?` · chapitre tombé ${s.meta.years}/${s.meta.totalYears} années`:''} · faits ${x.done}/${x.n}${x.done?` · ${Math.round(x.succ*100)} % justes à la dernière tentative`:''}${last?` · dernier passage ${last.score}/${last.n}${last.note20!=null?` (${last.note20}/20)`:''}`:''}</span></span>
    <span class="n17track" style="flex:0 0 110px"><span style="width:${x.n?Math.round(x.done/x.n*100):0}%"></span></span>
    <button class="${s.type==='exam'?'secondary':'primary'}" onclick="refStart(${JSON.stringify(s.id).replace(/"/g,'&quot;')},false)">▶️ Réviser</button>
    ${s.type==='exam'?`<button class="primary" onclick="refStart(${JSON.stringify(s.id).replace(/"/g,'&quot;')},true)">🏁 Passer l'examen</button>`:''}
@@ -6757,12 +6785,13 @@ window.v19More=function(){
   <button type="button" class="v19-round" aria-label="Fermer" onclick="v19CloseMore()">${I.x}</button></div>
   <div class="grid6">
    ${tile('annales',I.cal,'Annales',`${nAnn} annales`)}
-   ${tile('stats',I.chart,'Statistiques','progression, notions')}
+   ${tile('stats',I.chart,'Statistiques','progression, chapitres')}
    ${tile('import',I.down,'Importer','une nouvelle annale')}
    ${tile('incoh',I.alert,'Incohérences',nInc?`${nInc} à vérifier`:'rien à vérifier',nInc>0)}
    ${tile('control',I.search,'Contrôle',nCtl?`${nCtl} QCM à valider`:'banque contrôlée',nCtl>0)}
    ${tile('backup',I.save,'Sauvegarde',`dernière : ${bkTxt}`,!bk||bk.d>=7)}
   </div>
+  <button type="button" class="tile" style="width:100%;min-height:64px;margin-top:10px;flex-direction:row;align-items:center;gap:12px;justify-content:flex-start" onclick="v19Notions()">${I.layers}<span>Chapitres<br><span class="sub">renommer, fusionner, voir les QCM d'un chapitre</span></span></button>
   <div class="card" style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h3 style="margin:0">Taille du texte</h3>${zoomCtl()}</div>
    <h3 style="margin:6px 0 0">Réglages de l'accueil</h3>
@@ -6773,7 +6802,7 @@ window.v19More=function(){
    </div>
    <div><button type="button" class="primary" onclick="v19SaveCfg()">Enregistrer</button></div>
   </div>
-  <p class="small" style="margin:10px 4px 0">QCM Médecine v19 · ${db.records.length} QCM · données enregistrées sur cet appareil.</p>`;
+  <p class="small" style="margin:10px 4px 0">QCM Médecine v19.6 · ${db.records.length} QCM · données enregistrées sur cet appareil.</p>`;
  sh.classList.add('show');
 };
 window.v19CloseMore=function(){const sh=$('v19sheet');if(sh)sh.classList.remove('show')};
@@ -6829,7 +6858,7 @@ window.v19DropResume=function(){try{localStorage.removeItem(LS_RESUME)}catch(e){
 function wrapLabel(name,label){const f=window[name];if(typeof f!=='function')return;window[name]=function(){labelNext(typeof label==='function'?label.apply(this,arguments):label);return f.apply(this,arguments)}}
 wrapLabel('refStart',(key,asExam)=>{if(asExam)return null;const s=V18.ensureRef&&V18.ensureRef().series.find(x=>x.id===key);return s?`${ueName(s.ue)} · ${s.title}`:'Série du référentiel'});
 wrapLabel('startNotionSession',(ue,n)=>`${ueName(ue)} · ${n}`);
-wrapLabel('startTopMix','Notions prioritaires');
+wrapLabel('startTopMix','Chapitres prioritaires');
 wrapLabel('startErrorsSession','Carnet d\'erreurs');
 wrapLabel('startSession','Session personnalisée');
 wrapLabel('startFlash','Flashcards vrai / faux');
@@ -6932,18 +6961,19 @@ function renderHomeV19(){
   :`<div class="v19-hero">
    <div class="lab">Session du jour</div>
    <div class="big"><div class="num sm">Rien à réviser aujourd'hui</div></div>
-   <div class="what" style="font-size:17px;opacity:.92">Tout est à jour. Profite-en pour avancer sur les notions prioritaires ou passer un concours blanc.</div>
-   <div class="acts"><button type="button" class="go" onclick="startTopMix('all')">Série des notions prioritaires</button><button type="button" class="alt" onclick="v19GoExam()">Concours blanc</button></div></div>`;
+   <div class="what" style="font-size:17px;opacity:.92">Tout est à jour. Profite-en pour avancer sur les chapitres prioritaires ou passer un concours blanc.</div>
+   <div class="acts"><button type="button" class="go" onclick="startTopMix('all')">Série des chapitres prioritaires</button><button type="button" class="alt" onclick="v19GoExam()">Concours blanc</button></div></div>`;
  // « Ensuite »
  const nx=[];
  const r2=rec2Next();
  if(r2)nx.push(row(I.repeat,'#0F6B5C','#E3F1ED',`Tombés au moins 2 fois · ${esc(ueName(r2.s.ue))}`,`${r2.st.done} / ${r2.st.n} faits · ${r2.rest} restant${r2.rest>1?'s':''}`,`refStart(${J(r2.s.id)},false)`));
+ nx.push(row(I.book,'#0F6B5C','#E3F1ED','Réviser par chapitre','Choisis une UE puis un chapitre de ton cours','v19GoChapters()'));
  if(V17.openErrors){const e=V17.openErrors();const nq=uniqA(e.map(x=>x.q.id)).length;
   nx.push(row(I.errbook,'#B5530F','#FBEBDD','Carnet d\'erreurs',e.length?`${e.length} piège${e.length>1?'s':''} pas encore corrigé${e.length>1?'s':''} · ${nq} QCM`:'Vide pour l\'instant : bravo','openCarnet()'))}
  if(V17.affIndex){const rec=V17.affIndex().all.filter(g=>!g.contradictory&&g.nQcm>1);const due=rec.filter(g=>{const p=progress[g.id];return !p||!p.due||p.due<=endOfToday()}).length;
   nx.push(row(I.cards,'#3B5BA9','#E8ECF7','Flashcards vrai / faux',`${rec.length} affirmations récurrentes · ${due} à revoir`,'v19Flash()'))}
  if(V17.topNotions){const t=V17.topNotions('all',1)[0];
-  if(t)nx.push(row(I.target,'#6A43A3','#F2EDF8','Notion à cibler',`${esc(t.name)} · ${esc(ueName(t.ue))} · ${pc(t.mastery)} % maîtrisé`,`startNotionSession(${J(t.ue)},${J(t.name)})`))}
+  if(t)nx.push(row(I.target,'#6A43A3','#F2EDF8','Chapitre à cibler',`${esc(t.name)} · ${esc(ueName(t.ue))} · ${pc(t.mastery)} % maîtrisé`,`startNotionSession(${J(t.ue)},${J(t.name)})`))}
  const ueCards=ues.map(u=>{const m=ueMastery(u);const [col]=ueCol(u);
   return `<button type="button" class="v19-ue" onclick="v19UE(${J(u)})"><span class="c">${esc(ueCode(u))}</span><span class="l"><b>${esc(ueName(u))}</b><span>${pc(m)} %</span></span><span class="v19-trk"><i style="width:${pc(m)}%;background:${col}"></i></span></button>`}).join('');
  el.innerHTML=`<div class="v19h">
@@ -7009,7 +7039,7 @@ window.renderCard=function(){
    <div class="v19q-prog"><div class="r"><b>Session</b><span>${session.idx+1} / ${n} · ${okN} juste${okN>1?'s':''}</span></div><div class="progress" style="margin:0"><div style="width:${Math.round(session.idx/n*100)}%"></div></div></div>${zoomCtl()}</div>
   <div class="v19q-grid">
    <div class="v19q-main">
-    <div class="v19q-tags">${ueTag(ueOf(q))}<span>${esc(notionOfQ(q))}</span><span>· ${esc(yearOf(q)||'')}${deriveNumber(q)?` · Q${deriveNumber(q)}`:''}</span>${recurrenceBadge(q,true)}</div>
+    <div class="v19q-tags">${ueTag(ueOf(q))}<span>${esc(notionOfQ(q))}${(()=>{const s=subsOf(ueOf(q),notionOfQ(q)).find(([n])=>n===subOf(q));return s?' › '+esc(s[0]):''})()}</span><span>· ${esc(yearOf(q)||'')}${deriveNumber(q)?` · Q${deriveNumber(q)}`:''}</span>${recurrenceBadge(q,true)}</div>
     <h2 class="q">${esc(q.question)}</h2>
     ${figureImage(q)?renderFigure(q):(img?`<img class="sourceimg" src="${img}" alt="Page de l'annale">`:'')}
     <div class="v19-choices">${letters.map(choice).join('')}</div>
@@ -7049,13 +7079,13 @@ function renderRefV19(){
  let feat='';
  if(next){const x=SS(next),isRec=next.type==='rec2';
   const desc=isRec?`${x.n} QCM tombés à au moins deux examens officiels${next.meta&&next.meta.n3?`, dont ${next.meta.n3} tombés 3 fois ou plus`:''}`
-   :next.type==='exam'?`Examen blanc de ${x.n} QCM, à passer chronométré`:next.type==='top'?`${x.n} QCM incontournables, repris d'une année sur l'autre`:`${x.n} QCM sur cette notion, les plus rentables d'abord`;
+   :next.type==='exam'?`Examen blanc de ${x.n} QCM, à passer chronométré`:next.type==='top'?`${x.n} QCM incontournables, repris d'une année sur l'autre`:`${x.n} QCM de ce chapitre, les plus rentables d'abord`;
   feat=`<div class="v19r-feat"><div class="l"><span class="k">Prochaine étape</span><span class="t">${esc(next.title)}</span><span class="d">${desc}</span>
    <span class="p"><span class="tr"><i style="width:${x.n?Math.round(x.done/x.n*100):0}%"></i></span><span>${x.done} / ${x.n} faits${x.done?` · ${pc(x.succ)} % justes`:''}</span></span></div>
    <div class="r"><button type="button" class="go" onclick="refStart(${J(next.id)},${next.type==='exam'})">${x.done?'Continuer':'Commencer'}</button>
    <div class="sm">${next.type!=='exam'?`<button type="button" onclick="refStart(${J(next.id)},true)">Mode examen</button>`:''}<button type="button" onclick="refPrint(${J(next.id)})">Imprimer</button></div></div></div>`;
  }else feat=`<div class="v19r-feat"><div class="l"><span class="k">Parcours terminé</span><span class="t">Tout est maîtrisé en ${esc(ueName(ue))}</span><span class="d">Repasse les examens blancs de temps en temps pour entretenir.</span></div></div>`;
- const sec=(t,title,note)=>{const ll=list.filter(s=>s.type===t);const shown=ll.filter(s=>s!==next);if(!shown.length)return '';
+ const sec=(t,title,note)=>{const ll=list.filter(s=>s.type===t);const shown=ll.filter(s=>s!==next);if(t==='notion')shown.sort((a,b)=>a.title.localeCompare(b.title,'fr',{numeric:true}));if(!shown.length)return '';
   const done=ll.filter(s=>SS(s).mastered).length;
   return `<div class="v19r-sec"><div class="top"><h3>${title}</h3><span>${note?note+' · ':''}${done}/${ll.length} maîtrisée${done>1?'s':''}</span></div><div class="v19r-grid">${shown.map(card).join('')}</div></div>`};
  const ex=list.filter(s=>s.type==='exam');
@@ -7069,11 +7099,11 @@ function renderRefV19(){
   ${stale?`<div class="warnbox" style="margin:0;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>La banque a changé depuis la génération (${ref.nRecords} → ${db.records.length} QCM).</span><button type="button" class="primary" onclick="regenRef()">Régénérer</button></div>`:''}
   ${feat}
   ${sec('rec2','Tombés au moins 2 fois','la série prioritaire')}
-  ${sec('notion','Par notion','les plus fréquentes d\'abord')}
+  ${sec('notion','Par chapitre','dans l\'ordre du cours')}
   ${sec('top','Incontournables','à refaire jusqu\'à zéro erreur')}
   ${exRow}
-  ${extra.length?`<details><summary>Compléments : ${extra.length} série(s) de notions rares ou qui ne tombent plus</summary><div class="v19r-grid" style="margin-top:12px">${extra.map(card).join('')}</div></details>`:''}
-  <details><summary>Comment ce référentiel est construit</summary><p class="small">${st.usable||0} QCM corrigés sur ${st.total||0}, soit ${st.reps||0} QCM distincts une fois les copies d'une année sur l'autre fusionnées (${st.dup||0} copies). Le référentiel retient les ${st.core||0} QCM des notions qui tombent régulièrement, dont ${st.top||0} incontournables. Taille d'un examen : ${st.examSize||'?'} QCM. Généré le ${fmtDate(ref.generatedAt)}.</p>
+  ${extra.length?`<details><summary>Compléments : ${extra.length} série(s) de chapitres rares ou qui ne tombent plus</summary><div class="v19r-grid" style="margin-top:12px">${extra.map(card).join('')}</div></details>`:''}
+  <details><summary>Comment ce référentiel est construit</summary><p class="small">${st.usable||0} QCM corrigés sur ${st.total||0}, soit ${st.reps||0} QCM distincts une fois les copies d'une année sur l'autre fusionnées (${st.dup||0} copies). Le référentiel retient les ${st.core||0} QCM des chapitres qui tombent régulièrement, dont ${st.top||0} incontournables. Taille d'un examen : ${st.examSize||'?'} QCM. Généré le ${fmtDate(ref.generatedAt)}.</p>
    <button type="button" class="secondary" onclick="regenRef()">Régénérer le référentiel</button></details>
  </div>`;
 }
@@ -7083,6 +7113,262 @@ window.regenRef=function(){
  if(!confirm('Régénérer le référentiel à partir de la banque actuelle ?\n\nLes séries peuvent changer de contenu. Ta progression sur chaque QCM est conservée.'))return;
  V18.ensureRef(true);renderRefV19();
 };
+
+/* ---------- Chapitres de cours (programme de David) ---------- */
+// Chaque QCM classé automatiquement est rangé dans un chapitre de cours, à partir de
+// sa notion d'origine et, si besoin, de mots-clés de l'énoncé puis des propositions.
+const CHAP_V=2;
+const HC='Hors chapitres · ';
+const CH={
+ M:[
+  [/Corr[ée]lation|Estimation|Lois de prob|Probabilit|Statistique descr|Tests statist|Fonctions|M[ée]trologie/,'01 · Biostatistiques (fiche bio stat)'],
+  [/descriptive/,'03 · Épidémiologie descriptive'],
+  [/[ÉE]tudes [ée]tiologiques/,'05 · Épidémiologie étiologique'],
+  [/Essais th|Tests diagnostiques/,'04 · Épidémiologie évaluative'],
+  [/infectieuses/,[[/cas.temoins|cohorte|risque relatif|odds|\brr\b|\bor\b|exposes?\b|taux d.attaque|investigation|facteur de risque/,'05 · Épidémiologie étiologique'],
+   [/vaccin|efficacite|depistage|essai|sensibilite|specificite/,'04 · Épidémiologie évaluative'],
+   [/incidence|prevalence|taux|mortalite|letalite|surveillance|notifi|r0|reproduction/,'03 · Épidémiologie descriptive'],'02 · Épidémiologie synthèse']]
+ ],
+ C:[
+  [/Membrane plasmique/,'01 · Membrane plasmique'],
+  [/Jonctions/,[[/jonction|desmosome|hemidesmosome|zonula|macula|gap|communicante/,'01 · Membrane plasmique'],'10 · Migration et domiciliation cellulaire']],
+  [/Notions de biochimie/,[[/cytosol|hyaloplasm|cytoplasm|proteasome|ribosome libre/,'02 · Cytoplasme','s'],HC+'Biochimie (code génétique…)']],
+  [/^Noyau/,'03 · Noyau'],
+  [/endomembranaire/,'04 · Système endomembranaire'],
+  [/Mitochondries/,'05 · Mitochondries et peroxysomes'],
+  [/Cytosquelette/,[[/migration|motilite|locomotion|chimiotact|lamellipod|domiciliation|diapedese|homing/,'10 · Migration et domiciliation cellulaire'],'06 · Cytosquelette']],
+  [/Cycle cellulaire/,'07 · Cycle cellulaire et sa régulation'],
+  [/Mort cellulaire/,'08 · Mort cellulaire'],
+  [/Cellules souches/,'09 · Différenciation cellulaire'],
+  [/^Signalisation/,'11 · Communication cellulaire'],
+  [/Épithéliums/,[[/filaments intermediaires|keratine/,'06 · Cytosquelette'],HC+'Histologie (tissus, épithéliums)']],
+  [/Tissus/,HC+'Histologie (tissus, épithéliums)'],
+  [/Développement|Fécondation|Gamétogenèse|Ovogenèse/,HC+'Embryologie & reproduction'],
+  [/Méthodes d/,HC+'Méthodes d\'étude (histologie, microscopie, fractionnement)'],
+  [/./,HC+'Généralités & figures à classer']
+ ],
+ P:[
+  [/Résonance magnétique/,'01 · Résonance magnétique nucléaire'],
+  [/Magnétisme/,[[/precession|gyromagnetique|larmor|resonance/,'01 · Résonance magnétique nucléaire'],'02 · Magnétostatisme']],
+  [/Ondes/,[[/refraction|diffraction|snell|indice de refraction|interference/,'04 · Réfraction et diffraction'],[/rayons? x|gamma/,'09 · Rayons X et gamma et rayonnements particuliers'],'03 · Natures et propagation des ondes']],
+  [/LASER/,'05 · Les lasers'],
+  [/Optique physiologique/,[[/obscurite|bipolaire|ganglionnaire|photorecept|batonnet|cones?\b|rhodopsine|polarisation des cellules|transduction/,'06 · Transduction du signal visuel'],
+   [/ametropie|astigmat|hypermetrop|myop|presbyt|correction|verre|lentille correctrice/,'08 · Troubles de la réfraction'],'07 · Optique et œil humain']],
+  [/Photométrie/,'18 · Lumière'],
+  [/Interactions rayonnements/,'15 · Interactions des REM avec la matière'],
+  [/Radioactivité/,[[/attenu|epaisseur|paravent|ecran de plomb|parois/,'15 · Interactions des REM avec la matière'],'11 · Sources radioactives']],
+  [/Structure de l.atome/,[[/modele|bohr|niveaux? d.energie/,'13 · Les modèles atomiques'],'12 · Atomes et noyaux, rappels']],
+  [/Semi-conducteurs/,'16 · Détecteurs'],
+  [/Solutions/,'20 · Chimie générale'],
+  [/./,HC+'Unités & grandeurs']
+ ],
+ PH:[
+  [/Potentiel d.action/,[[/transport actif|pompe|atpase|cotransport|symport|antiport|diffusion facilitee|transporteur/,'07 · Transport membranaire','s'],'01 · Excitabilité membranaire']],
+  [/Potentiel de repos/,[[/transport actif|pompe|atpase|cotransport|symport|antiport|diffusion facilitee|transporteur/,'07 · Transport membranaire','s'],[/^excitabilite/,'01 · Excitabilité membranaire','s'],'10 · Potentiel électrochimique']],
+  [/Thermorégulation/,'02 · Thermorégulation'],
+  [/Compartiments/,[[/echange|perfus|starling|oncotique|hydrostatique|mouvements? d.eau|filtration|oedeme|deshydrat|hyperhydrat|transcapillaire/,'04 · Échanges entre les compartiments'],'03 · Physiologie des compartiments liquidiens']],
+  [/Hémodynamique/,[[/starling|transcapillaire|filtration|oncotique/,'04 · Échanges entre les compartiments'],HC+'Hémodynamique (écoulements, Bernoulli, Laplace)']],
+  [/Jonction neuromusculaire/,'*JNM'],
+  [/Métabolisme de base/,'*NUT'],
+  [/nerveux autonome/,'09 · Système nerveux autonome'],
+  [/acido-basique|Davenport/,'11 · Diagramme de Davenport'],
+  [/pH|Solutions|Thermodynamique/,HC+'Chimie (pH, solutions, thermodynamique)']
+ ],
+ B:[
+  [/Acides aminés/,'01 · Acides aminés'],
+  [/Peptides/,[[/^\W*(qcm \d+\W*)?traduction/,'18 · Synthèse des protéines'],[/proteasome|ubiquitin|degradation des proteines/,'19 · Dégradation des protéines'],[/peptide/,'02 · Peptides'],'10 · Protéine']],
+  [/Techniques de séparation|Enzymologie/,'10 · Protéine'],
+  [/Glucides/,'03 · Structure des glucides'],
+  [/Glycolyse/,'04 · Glycolyse'],
+  [/Néoglucogenèse/,[[/hormon|insuline|glucagon|adrenaline|regulation/,'07 · Contrôle hormonal'],'04 · Glycolyse']],
+  [/Lipides/,[[/structure/,'05 · Structure des lipides','s'],[/degradation|metabolisme|oxydation|bilan|synthese des acides gras|cetog|lipogen|lipolyse|lipoprotein|catabol/,'06 · Métabolisme lipidique'],'05 · Structure des lipides']],
+  [/Régulation hormonale/,'07 · Contrôle hormonal'],
+  [/Cycle de Krebs/,[[/chaine respiratoire|oxydations? phosphorylantes?|phosphorylation oxydative|atp synthase|acetyl.?coa|pyruvate deshydrogenase/,'09 · Oxydation phosphorylante + Source d\'acétyl-CoA'],[/krebs|riches en energie|role central|\batp\b|matrice/,'08 · Cycle de Krebs + Rôle central de l\'ATP','s'],'08 · Cycle de Krebs + Rôle central de l\'ATP']],
+  [/Acides nucléiques/,[[/chromatine|chromosome|histone|nucleosome|centromere|telomere|heterochromatine|euchromatine/,'14 · Organisation de la chromatine et des chromosomes'],
+   [/de l.adn au chromosome|compaction/,'11 · De l\'ADN au chromosome'],
+   [/acides nucleiques|nucleotid|nucleosid|bases? azot|techniques d.etude/,'12 · Les acides nucléiques','s'],
+   [/genome/,'13 · Génomes','s'],'12 · Les acides nucléiques']],
+  [/Réplication/,[[/recombinaison/,'20 · Réparation de l\'ADN 2'],'15 · Réplication et réparation de l\'ADN 1']],
+  [/Transcription/,[[/maturation|epissage|coiffe|polyadenyl|edition/,'17 · Maturation des ARNm','s'],[/transcription/,'16 · Transcription','s'],[/maturation|epissage|coiffe|polyadenyl/,'17 · Maturation des ARNm'],'16 · Transcription']],
+  [/Traduction/,[[/proteasome|ubiquitin|degradation/,'19 · Dégradation des protéines'],'18 · Synthèse des protéines']],
+  [/./,HC+'Chimie générale & organique']
+ ]
+};
+const JNM=/jonction|neuromusculaire|plaque motrice|acetylcholin|curare|myasthen|cholinesterase|nicotinique/g;
+const MUS=/sarcomere|actine|myosine|tetanos|secousse|tension|force|troponine|tropomyosine|rigor|fibres? (lentes|rapides)|longueur|sommation|reticulum sarcoplasmique|(^|[^o])musculaire|muscle|contraction/g;
+const BIO=/bioenerget|metabolisme de base|thermogen|depense energetique|calorimetr|quotient respiratoire|musculation|cellules musculaires|rendement|atp/g;
+const NUT=/nutri|regime|aliment|apports?\b|ration|vitamine|carence|repas|mange|vegetal|grossesse|enceinte|imc|surpoids|obes|maigr/g;
+function chapterOf(q){
+ const k=ukey(ueOf(q));const T=CH[k];if(!T||!V17.classify)return null;
+ const base=V17.classify(q);
+ const stem=deacc(q.question||'').replace(/\s+/g,' ').trim();
+ const txt=stem+' '+deacc(Object.values(q.choices||{}).join(' '));
+ for(const [re,dest] of T){
+  if(!re.test(base))continue;
+  if(dest==='*JNM'){
+   const s1=(stem.match(JNM)||[]).length,s2=(stem.match(MUS)||[]).length;
+   if(s1&&!s2)return '06 · Jonction neuromusculaire';if(s2&&!s1)return '05 · Physiologie musculaire';
+   const t1=(txt.match(JNM)||[]).length,t2=(txt.match(MUS)||[]).length;
+   return t1>t2?'06 · Jonction neuromusculaire':'05 · Physiologie musculaire';
+  }
+  if(dest==='*NUT'){
+   const s1=(stem.match(BIO)||[]).length,s2=(stem.match(NUT)||[]).length;
+   if(s1>s2)return '08 · Bioénergétique : thermogenèse';if(s2>s1)return '12 · Nutrition';
+   const t1=(txt.match(BIO)||[]).length,t2=(txt.match(NUT)||[]).length;
+   return t1>t2?'08 · Bioénergétique : thermogenèse':'12 · Nutrition';
+  }
+  if(typeof dest==='string')return dest;
+  const def=dest[dest.length-1];
+  for(const [r,c] of dest.slice(0,-1))if(r.test(stem))return c;
+  for(const [r,c,f] of dest.slice(0,-1))if(f!=='s'&&r.test(txt))return c;
+  return def;
+ }
+ return null;
+}
+function applyChapters(force){
+ let n=0;
+ for(const q of db.records){
+  if(q.notionAuto===false)continue;
+  if(!force&&q.chapV===CHAP_V&&q.notion)continue;
+  const c=chapterOf(q);
+  if(c&&c!==q.notion){q.notion=c;n++}
+  q.notionAuto=true;q.chapV=CHAP_V;
+ }
+ return n;
+}
+window.__chapterOf=chapterOf;
+
+/* ---------- Gérer les notions : renommer / fusionner ---------- */
+const LS_REN='qcmMedNotionRenames';
+const TRAD='Traduction, code génétique & adressage des protéines';
+function loadRen(){try{return JSON.parse(localStorage.getItem(LS_REN)||'{}')||{}}catch(e){return {}}}
+function saveRen(m){try{localStorage.setItem(LS_REN,JSON.stringify(m))}catch(e){}}
+function applyRenames(){
+ const m=loadRen();let n=applyChapters(false);
+ for(const q of db.records){
+  const k=ukey(ueOf(q));
+  const to=m[(k||ueOf(q))+'|'+q.notion];
+  if(to&&to!==q.notion){q.notion=to;n++}
+ }
+ return n;
+}
+window.__notionUE=window.__notionUE||null;window.__notionEdit=null;
+function notionRows(ue){
+ const c={};for(const q of db.records)if(ueOf(q)===ue){const n=notionOfQ(q);c[n]=(c[n]||0)+1}
+ return Object.entries(c).sort((a,b)=>a[0].localeCompare(b[0],'fr'));
+}
+window.v19Notions=function(){
+ v19CloseMore();
+ const ues=ueList();const ue=ues.includes(window.__notionUE)?window.__notionUE:ues[0];window.__notionUE=ue;
+ const rows=notionRows(ue);const ed=window.__notionEdit;
+ const html=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px"><h2 style="margin:0">Chapitres</h2>
+  <button type="button" class="v19-round" aria-label="Fermer" onclick="window.__notionEdit=null;closeModal()">${I.x}</button></div>
+  <div class="v19-seg" role="group" aria-label="UE" style="margin-bottom:12px">${ues.map(u=>`<button type="button" class="${u===ue?'on':''}" onclick="window.__notionUE=${J(u)};window.__notionEdit=null;v19Notions()">${esc(ueName(u))}</button>`).join('')}</div>
+  <p class="small" style="margin:0 0 10px">Renommer change le nom pour tous les QCM du chapitre, y compris les futurs QCM classés automatiquement. Donner le nom d'un chapitre qui existe déjà les fusionne.</p>
+  <div class="v19-nl">${rows.map(([n,c],i)=>ed===i?`<div class="v19-nr ed"><input id="v19NotionName" type="text" value="${esc(n)}" aria-label="Nouveau nom" onkeydown="if(event.key==='Enter')v19NotionSave(${J(n)})">
+     <button type="button" class="primary" onclick="v19NotionSave(${J(n)})">Valider</button><button type="button" class="secondary" onclick="window.__notionEdit=null;v19Notions()">Annuler</button></div>`
+   :`<div class="v19-nr"><span class="nm">${esc(n)}</span><span class="ct">${c} QCM</span>
+     <button type="button" class="secondary" onclick="window.__notionEdit=${i};v19Notions();setTimeout(()=>{const e=document.getElementById('v19NotionName');if(e){e.focus();e.select()}},30)">Renommer</button>
+     <button type="button" class="secondary" onclick="v19NotionBank(${J(ue)},${J(n)})">Voir</button></div>`).join('')}</div>`;
+ showModalV19(html);
+};
+function showModalV19(html){document.getElementById('modalContent').innerHTML=html;document.getElementById('modal').classList.add('show')}
+window.v19NotionSave=function(old){
+ const ue=window.__notionUE,nw=($('v19NotionName')?.value||'').replace(/\s+/g,' ').trim();
+ if(!nw||nw===old){window.__notionEdit=null;return v19Notions()}
+ const exists=notionRows(ue).some(([n])=>n===nw);
+ if(exists&&!confirm(`Le chapitre « ${nw} » existe déjà en ${ueName(ue)}.\n\nFusionner « ${old} » avec elle ?`))return;
+ const k=ukey(ue)||ue,m=loadRen();
+ for(const key of Object.keys(m))if(key.startsWith(k+'|')&&m[key]===old)m[key]=nw;
+ m[k+'|'+old]=nw;delete m[k+'|'+nw];
+ saveRen(m);
+ let n=0;for(const q of db.records)if(ueOf(q)===ue&&q.notion===old){q.notion=nw;n++}
+ window.__notionEdit=null;
+ persist();try{if(V18.ensureRef)V18.ensureRef(true)}catch(e){}
+ try{refreshAll()}catch(e){}
+ v19Notions();
+};
+window.v19NotionBank=function(ue,n){
+ closeModal();show('bank');
+ const fu=$('filterUE');if(fu){fu.value=ue;if(fu.onchange)fu.onchange()}
+ const fn=$('filterNotion');if(fn){fn.value=n;window.__bankLimit=undefined;renderBank()}
+};
+const _reclass=window.reclassNotions;
+if(_reclass)window.reclassNotions=function(){for(const q of db.records)if(q.notionAuto!==false)q.chapV=0;const r=_reclass.apply(this,arguments);if(applyRenames())persist();try{if(V18.ensureRef)V18.ensureRef(true)}catch(e){}return r};
+
+/* ---------- Sous-chapitres ---------- */
+// Pour les gros chapitres, l'ancienne notion fine (classement par mots-clés) sert de sous-chapitre.
+function subOf(q){
+ if(!V17.classify)return '';
+ let s=V17.classify(q)||'';
+ s=s.replace(/^Signalisation\s*[–-]\s*/,'');
+ return s.charAt(0).toUpperCase()+s.slice(1);
+}
+const SUB_MIN_CHAP=20, SUB_MIN=3;
+function subsOf(ue,name){
+ const qs=db.records.filter(q=>ueOf(q)===ue&&notionOfQ(q)===name&&(V17.usable?V17.usable(q):isValidated(q)));
+ if(qs.length<SUB_MIN_CHAP)return [];
+ const g={};for(const q of qs){const s=subOf(q);(g[s]=g[s]||[]).push(q)}
+ const min=Math.max(SUB_MIN,Math.ceil(qs.length*0.1));
+ const list=Object.entries(g).filter(([s,l])=>s&&l.length>=min&&!/^Autres/.test(s)).sort((a,b)=>b[1].length-a[1].length);
+ return list.length>=2?list:[];
+}
+window.__subOf=subOf;
+
+/* ---------- Réviser par chapitre ---------- */
+function chapterRows(ue){
+ const rows=(V17.notionTable?V17.notionTable(ue):[]).filter(r=>r.n>0);
+ return rows.slice().sort((a,b)=>a.name.localeCompare(b.name,'fr',{numeric:true}));
+}
+function chapterQueue(ue,name,onlyTodo,sub){
+ const qs=db.records.filter(q=>ueOf(q)===ue&&notionOfQ(q)===name&&(V17.usable?V17.usable(q):isValidated(q))&&(!sub||subOf(q)===sub));
+ const score=q=>{const p=progress[q.id];if(!p||!p.history||!p.history.length)return 0;      // jamais vu
+  if(p.due&&p.due<=endOfToday())return 1;                                                  // à revoir
+  const s=V17.qScore?V17.qScore(q):null;return 2+(s===null?0:s)};                           // déjà su : à la fin
+ const sh=qs.slice();for(let i=sh.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[sh[i],sh[j]]=[sh[j],sh[i]]}
+ sh.sort((a,b)=>Math.floor(score(a))-Math.floor(score(b))||score(a)-score(b));
+ return onlyTodo?sh.filter(q=>score(q)<2||(V17.qScore&&V17.qScore(q)<1)):sh;
+}
+window.v19Chapter=function(ue,name,onlyTodo,sub){
+ const ids=chapterQueue(ue,name,onlyTodo,sub).map(q=>q.id);
+ if(!ids.length){alert(onlyTodo?'Rien à revoir dans ce chapitre : tout est su pour l\'instant.':'Aucun QCM corrigé dans ce chapitre.');return}
+ session={queue:ids,idx:0,sel:new Set(),revealed:false,results:[],startedAt:Date.now(),deferred:0};
+ session.v19label=`${ueName(ue)} · ${name}${sub?' › '+sub:''}`;
+ show('review');
+};
+window.v19ChapUE=function(ue){const c=cfg();c.chapUE=ue;saveCfg(c);const el=$('v19chap');if(el)el.outerHTML=chapterCard()};
+function subsHtml(ue,name){
+ const subs=subsOf(ue,name);if(!subs.length)return '';
+ return `<details class="v19-subs"><summary>${subs.length} sous-chapitres</summary>${subs.map(([s,l])=>{
+  const seen=l.filter(q=>(progress[q.id]?.history||[]).length).length;
+  return `<div class="v19-sub"><span class="nm">${esc(s)}</span><span class="ct">${l.length} QCM · ${seen} vus</span><button type="button" class="secondary" onclick="v19Chapter(${J(ue)},${J(name)},false,${J(s)})">Réviser</button></div>`}).join('')}</details>`;
+}
+function chapterCard(){
+ const ues=ueList();if(!ues.length)return '';
+ const c=cfg();const ue=ues.includes(c.chapUE)?c.chapUE:ues[0];
+ const rows=chapterRows(ue);
+ const [col]=ueCol(ue);
+ const item=r=>{
+  const qs=chapterQueue(ue,r.name,false),todo=chapterQueue(ue,r.name,true).length;
+  const seen=qs.filter(q=>(progress[q.id]?.history||[]).length).length;
+  return `<div class="v19c-row"><div class="tx"><span class="t">${esc(r.name)}</span>
+   <span class="s">${qs.length} QCM · ${seen} vus · maîtrise ${pc(r.mastery)} %${r.years?` · tombé ${r.years}/${r.totalYears} années`:''}</span>
+   <span class="v19-trk"><i style="width:${pc(r.mastery)}%;background:${col}"></i></span>${subsHtml(ue,r.name)}</div>
+   <div class="bt">${todo&&todo<qs.length?`<button type="button" class="secondary" onclick="v19Chapter(${J(ue)},${J(r.name)},true)">À revoir (${todo})</button>`:''}
+   <button type="button" class="primary" onclick="v19Chapter(${J(ue)},${J(r.name)},false)"${qs.length?'':' disabled'}>Réviser${qs.length?` (${qs.length})`:''}</button></div></div>`;
+ };
+ return `<div class="card v19c" id="v19chap"><div class="top"><h3>Réviser par chapitre</h3>
+  <div class="v19-seg" role="group" aria-label="UE">${ues.map(u=>`<button type="button" class="${u===ue?'on':''}" onclick="v19ChapUE(${J(u)})">${esc(ueName(u))}</button>`).join('')}</div></div>
+  <p class="small" style="margin:6px 0 10px">Tous les QCM corrigés du chapitre : d'abord ceux jamais vus et ceux à revoir, puis ceux que tu sais déjà. « À revoir » ne garde que les jamais vus, les échus et les ratés.</p>
+  <div class="v19c-list">${rows.map(item).join('')||'<p class="small">Aucun QCM dans cette UE.</p>'}</div></div>`;
+}
+const _renderReviewV19=window.renderReview;
+window.renderReview=function(){
+ const r=_renderReviewV19.apply(this,arguments);
+ if(!session){const a=$('reviewArea');if(a&&!$('v19chap'))a.insertAdjacentHTML('afterbegin',chapterCard())}
+ return r;
+};
+window.v19GoChapters=function(){show('review');setTimeout(()=>{const c=$('v19chap');if(c)c.scrollIntoView({behavior:'smooth',block:'start'})},60)};
 
 /* ---------- Navigation ---------- */
 const _show=window.show;
@@ -7107,11 +7393,11 @@ if(ra)new MutationObserver(()=>{enhanceChoices();syncFocus();trackSession()}).ob
 const ib=document.querySelector('button[data-nav="incoh"]');
 if(ib)new MutationObserver(()=>updateTabs()).observe(ib,{childList:true,subtree:true});
 let tmr=null;const _persist=window.persist;
-window.persist=function(){const r=_persist.apply(this,arguments);clearTimeout(tmr);tmr=setTimeout(()=>updateTabs(),400);return r};
+window.persist=function(){try{applyRenames()}catch(e){}const r=_persist.apply(this,arguments);clearTimeout(tmr);tmr=setTimeout(()=>updateTabs(),400);return r};
 const cur=(document.querySelector('.view.active')||{}).id||'home';
 updateTabs(cur);
 if(cur==='home')renderHomeV19();
-window.bankReadyPromise.then(()=>setTimeout(()=>{const c=(document.querySelector('.view.active')||{}).id;if(c==='home')renderHomeV19();if(c==='ref')renderRefV19();updateTabs(c)},50));
+window.bankReadyPromise.then(()=>setTimeout(()=>{try{if(applyRenames()){persist();if(V18.ensureRef)V18.ensureRef(true)}}catch(e){console.warn(e)}const c=(document.querySelector('.view.active')||{}).id;if(c==='home')renderHomeV19();if(c==='ref')renderRefV19();updateTabs(c)},50));
 })();
 
 </script>
