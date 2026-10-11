@@ -352,6 +352,11 @@ body.v19-big .v19q-grid{grid-template-columns:1fr}
 .v19-sub .ct{font-size:13px;color:var(--muted)}
 .v19-sub button{min-height:40px;padding:0 14px}
 
+.v19x-opts{display:flex;flex-direction:column;gap:8px}
+.v19x-opt{display:flex;gap:12px;align-items:flex-start;background:#fff;border:2px solid var(--line);border-radius:14px;padding:12px 14px;margin:0;cursor:pointer}
+.v19x-opt input{width:22px;height:22px;min-height:0;margin-top:2px;accent-color:var(--accent)}
+.v19x-opt:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+
 </style></head><body>
 <header><b>🩺 QCM Médecine <span class="small" style="color:#9ca3af">v19</span></b>
 <nav>
@@ -1606,7 +1611,7 @@ async function restoreBackup(file){
 
    const appliqueEntete=(h)=>{
      if(!Array.isArray(h.records))throw new Error('Fichier invalide : aucune liste de QCM.');
-     replace=confirm(`Sauvegarde du ${(h.exportedAt||'?').slice(0,10)} : ${h.records.length} QCM.\n\nOK = REMPLACER toute la banque actuelle (${db.records.length} QCM).\nAnnuler = FUSIONNER (mise à jour des identifiants communs, ajout des nouveaux).`);
+     replace=(h.ue||h.annale)?false:confirm(`Sauvegarde du ${(h.exportedAt||'?').slice(0,10)} : ${h.records.length} QCM.\n\nOK = REMPLACER toute la banque actuelle (${db.records.length} QCM).\nAnnuler = FUSIONNER (mise à jour des identifiants communs, ajout des nouveaux).`);
      if(replace){db.records=h.records;progress=h.progress||{};added=h.records.length}
      else{
        for(const r of h.records){
@@ -3233,7 +3238,7 @@ function renderAnnalesByUE(){
          <button class="secondary" style="padding:2px 8px;font-size:.85em" onclick="event.stopPropagation();exportAnnaleParIndex(${idx})" title="Exporter uniquement cette annale (QCM, images, PDF sujet)">📤 Exporter</button>
        </div>${detail}</div>`;
    }).join('');
-   return `<div class="card"><h3>${esc(ue)} <span class="small">— ${annales.length} annale(s), ${totalQ} QCM</span></h3>${lignes}</div>`;
+   return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0">${esc(ue)} <span class="small">— ${annales.length} annale(s), ${totalQ} QCM</span></h3>${ue!=='—'?`<button class="primary" onclick="v19ExportUE(${JSON.stringify(ue).replace(/"/g,'&quot;')})">📤 Exporter toute l'UE</button>`:''}</div>${lignes}</div>`;
  }).join('');
  return `<div class="card"><h3>📚 Annales par UE</h3>
    <p class="small">Cliquez sur une annale pour dérouler ses QCM. « Ouvrir » affiche la fiche complète.</p></div>${blocs||'<div class="card"><p class="small">Aucune annale.</p></div>'}`;
@@ -6582,23 +6587,24 @@ function progressUI(label,done,total){
  const l=document.getElementById('bkLab'),p=document.getElementById('bkProg');
  if(l)l.textContent=label;if(p)p.style.width=(total?Math.round(done/total*100):0)+'%';
 }
-window.exportBackup=async function(withAssets,withPdfs){
- const kind=withPdfs?'intégrale':(withAssets?'complète':'légère');
- const stamp=new Date().toISOString().slice(0,10);
- const base=`qcm-medecine-sauvegarde-${stamp}${withPdfs?'-integrale':(withAssets?'':'-legere')}`;
+window.exportBackup=async function(withAssets,withPdfs,opts){
+  opts=opts||{};const F=opts.ue&&window.__ueFilter?window.__ueFilter(opts):null;
+  const kind=(withPdfs?'intégrale':(withAssets?'complète':'légère'))+(F?` de l'UE ${F.label}`:'');
+  const stamp=new Date().toISOString().slice(0,10);
+  const base=`qcm-medecine-${F?F.slug:'sauvegarde'}-${stamp}${withPdfs?'-integrale':(withAssets?'':'-legere')}`;
  try{
   if(typeof flushBank==='function')flushBank();
   progressUI('Banque et progression…',0,1);await tick();
   const header=new Blob([JSON.stringify({app:'qcm-medecine',version:16,format:'ndjson-1',exportedAt:new Date().toISOString(),
-    withAssets:!!withAssets,withPdfs:!!withPdfs,records:db.records,progress,exams:(typeof exams!=='undefined'?exams:[]),annexes:db.annexes||[]})+'\n']);
+    withAssets:!!withAssets,withPdfs:!!withPdfs,ue:F?F.ue:undefined,records:F?F.records:db.records,progress:F?F.progress:progress,exams:F?F.exams:(typeof exams!=='undefined'?exams:[]),annexes:F?F.annexes:(db.annexes||[])})+'\n']);
   // Liste des éléments lourds à ajouter
   const jobs=[];
   if(withAssets){
-   for(const src of Object.keys(RUNTIME_PAGE_ASSETS||{}))jobs.push(['page',src,()=>RUNTIME_PAGE_ASSETS[src]]);
+   for(const src of Object.keys(RUNTIME_PAGE_ASSETS||{}))if(!F||F.sources.has(src))jobs.push(['page',src,()=>RUNTIME_PAGE_ASSETS[src]]);
    for(const [t,map] of [['explain',RUNTIME_EXPLAIN],['figure',RUNTIME_FIGURE],['annexeImg',RUNTIME_ANNEXE]])
-     for(const k of Object.keys(map||{}))jobs.push([t,k,()=>map[k]]);
+     for(const k of Object.keys(map||{}))if(!F||(t==='annexeImg'?F.annexeIds.has(k):F.ids.has(k)))jobs.push([t,k,()=>map[k]]);
   }
-  if(withPdfs)for(const k of Object.keys(RUNTIME_PDFS||{}))jobs.push(['pdf',k,null]);
+  if(withPdfs)for(const k of Object.keys(RUNTIME_PDFS||{}))if(!F||F.pdf(k))jobs.push(['pdf',k,null]);
   const chunks=[[header]];let size=header.size,pdfOk=0,skipped=0;
   for(let i=0;i<jobs.length;i++){
    const [t,k,get]=jobs[i];
@@ -6626,7 +6632,8 @@ window.exportBackup=async function(withAssets,withPdfs){
   const canPick=typeof window.showSaveFilePicker==='function';
   modal(`<h2 style="margin-top:0">💾 Sauvegarde ${kind} prête</h2>
    <p>${n>1?`<b>${n} fichiers</b>`:'1 fichier'} · ${mo(total)}${withPdfs?` · ${pdfOk} PDF`:''}${skipped?` · <span class="badge b-warn">${skipped} élément(s) illisible(s) ignoré(s)</span>`:''}</p>
-   ${n>1?`<p class="small">Elle est découpée en ${n} parties pour que l'iPad puisse l'enregistrer. <b>Garde toutes les parties ensemble</b> : pour restaurer, sélectionne-les toutes d'un coup dans 💾 › Restaurer.</p>`:''}
+   ${F?`<p class="small">${F.records.length} QCM · ${F.sources.size} annale(s) de l'UE ${esc(F.label)}${F.withProgress?' · avec ta progression':' · sans progression'}. Pour l'importer sur un autre appareil : 💾 Sauvegarde › Restaurer. La fusion est automatique : les autres UE ne sont pas touchées.</p>`:''}
+    ${n>1?`<p class="small">Elle est découpée en ${n} parties pour que l'iPad puisse l'enregistrer. <b>Garde toutes les parties ensemble</b> : pour restaurer, sélectionne-les toutes d'un coup dans 💾 › Restaurer.</p>`:''}
    ${canShareAll?`<button class="primary" style="width:100%;margin:6px 0" onclick="bkShare(-1)">📤 Enregistrer ${n>1?`les ${n} fichiers`:'le fichier'} dans Fichiers</button>`:''}
    <div style="display:grid;gap:6px;margin-top:6px">${files.map((f,i)=>`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="small" style="flex:1 1 200px">${esc(f.name)} · ${mo(f.size)}</span>
      ${isIOS&&navigator.canShare?`<button class="secondary" onclick="bkShare(${i})">📤 Partager</button>`:''}
@@ -6802,7 +6809,7 @@ window.v19More=function(){
    </div>
    <div><button type="button" class="primary" onclick="v19SaveCfg()">Enregistrer</button></div>
   </div>
-  <p class="small" style="margin:10px 4px 0">QCM Médecine v19.6 · ${db.records.length} QCM · données enregistrées sur cet appareil.</p>`;
+  <p class="small" style="margin:10px 4px 0">QCM Médecine v19.7 · ${db.records.length} QCM · données enregistrées sur cet appareil.</p>`;
  sh.classList.add('show');
 };
 window.v19CloseMore=function(){const sh=$('v19sheet');if(sh)sh.classList.remove('show')};
@@ -6812,8 +6819,9 @@ window.v19Concours=function(){v19More();setTimeout(()=>{const e=$('v19Concours')
 /* ---------- Dernière sauvegarde ---------- */
 function lastBackup(){try{const b=JSON.parse(localStorage.getItem(LS_LASTBK)||'null');return b&&b.t?Object.assign(b,{d:daysAgo(b.t)}):null}catch(e){return null}}
 const _exportBackup=window.exportBackup;
-window.exportBackup=async function(withAssets,withPdfs){
+window.exportBackup=async function(withAssets,withPdfs,opts){
  const r=await _exportBackup.apply(this,arguments);
+ if(opts&&opts.ue)return r;
  try{localStorage.setItem(LS_LASTBK,JSON.stringify({t:Date.now(),kind:withPdfs?'intégrale':withAssets?'complète':'légère'}))}catch(e){}
  return r;
 };
@@ -7370,12 +7378,57 @@ window.renderReview=function(){
 };
 window.v19GoChapters=function(){show('review');setTimeout(()=>{const c=$('v19chap');if(c)c.scrollIntoView({behavior:'smooth',block:'start'})},60)};
 
+/* ---------- Exporter toutes les annales d'une UE ---------- */
+window.__ueFilter=function(opts){
+ const ue=opts.ue;
+ const records=db.records.filter(q=>ueOf(q)===ue);
+ const ids=new Set(records.map(q=>q.id));
+ const sources=new Set(records.map(q=>q.source).filter(Boolean));
+ const np=s=>(typeof normPdf==='function'?normPdf(s):String(s||'').toLowerCase());
+ const pdfNames=new Set([...sources,...records.map(q=>q.correctionSource).filter(Boolean)].map(np));
+ const withProgress=opts.withProgress!==false;
+ const prog={};if(withProgress)for(const id of ids)if(progress[id])prog[id]=progress[id];
+ const exs=withProgress?(typeof exams!=='undefined'?exams:[]).filter(e=>sources.has(e.source)||String(e.source||'').includes(' · '+ue+' · ')):[];
+ const annexes=(db.annexes||[]).filter(a=>sources.has(a.source));
+ const label=`${ueCode(ue)} ${ueName(ue)}`.trim();
+ return {ue,label,slug:label.replace(/[^a-z0-9]+/gi,'-').replace(/^-+|-+$/g,'').toLowerCase(),records,ids,sources,
+  pdf:k=>pdfNames.has(np(k)),progress:prog,exams:exs,annexes,annexeIds:new Set(annexes.map(a=>a.id)),withProgress};
+};
+window.v19ExportUE=function(ue){
+ const ues=ueList();ue=ues.includes(ue)?ue:ues[0];
+ const F=window.__ueFilter({ue,withProgress:true});
+ showModalV19(`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><h2 style="margin:0">Exporter une UE</h2>
+  <button type="button" class="v19-round" aria-label="Fermer" onclick="closeModal()">${I.x}</button></div>
+  <label>UE<select id="v19xUE" style="width:100%" onchange="v19ExportUE(this.value)">${ues.map(u=>`<option value="${esc(u)}"${u===ue?' selected':''}>${esc(u)}</option>`).join('')}</select></label>
+  <p class="small" style="margin:4px 0 12px"><b>${F.sources.size} annale(s)</b> · ${F.records.length} QCM. Seuls les QCM de cette UE sont exportés.</p>
+  <div class="v19x-opts" role="radiogroup" aria-label="Contenu">
+   <label class="v19x-opt"><input type="radio" name="v19xKind" value="0"><span><b>Légère</b><br><span class="small">QCM, réponses et corrections. Le plus petit fichier.</span></span></label>
+   <label class="v19x-opt"><input type="radio" name="v19xKind" value="1"><span><b>Complète</b><br><span class="small">+ images des pages, figures, explications et annexes.</span></span></label>
+   <label class="v19x-opt"><input type="radio" name="v19xKind" value="2" checked><span><b>Intégrale</b><br><span class="small">+ PDF des annales et de leurs corrigés. Pour tout retrouver sur un autre appareil.</span></span></label>
+  </div>
+  <label style="display:flex;gap:10px;align-items:center;margin:12px 0"><input type="checkbox" id="v19xProg" checked style="width:22px;height:22px;min-height:0"> Inclure ma progression (révisions, carnet d'erreurs, concours blancs)</label>
+  <p class="small" style="margin:0 0 12px">Décoche pour partager les annales à quelqu'un d'autre : il démarrera avec une progression vierge.</p>
+  <button type="button" class="primary" style="width:100%;min-height:52px" onclick="v19ExportUEGo()">Préparer l'export</button>`);
+};
+window.v19ExportUEGo=function(){
+ const ue=$('v19xUE')?.value;const k=Number((document.querySelector('input[name=v19xKind]:checked')||{}).value||2);
+ const withProgress=!!$('v19xProg')?.checked;
+ exportBackup(k>=1,k>=2,{ue,withProgress});
+};
+function backupUECard(){
+ const ues=ueList();if(!ues.length)return '';
+ return `<div class="card" id="v19bkUE"><h3>Sauvegarder une UE</h3>
+  <p class="small">Toutes les annales d'une seule UE, dans un fichier à part : pratique pour garder une copie par UE ou pour partager une UE. À la restauration, le fichier est fusionné, les autres UE ne bougent pas.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">${ues.map(u=>`<button type="button" class="secondary" onclick="v19ExportUE(${J(u)})">📤 ${esc(ueCode(u))} ${esc(ueName(u))}</button>`).join('')}</div></div>`;
+}
+
 /* ---------- Navigation ---------- */
 const _show=window.show;
 window.show=function(id){
  v19CloseMore();
  const r=_show.apply(this,arguments);
  if(id==='ref')renderRefV19();
+ if(id==='backup'){const s=$('backup');if(s&&!$('v19bkUE')){const c=s.querySelector('.card');if(c)c.insertAdjacentHTML('afterend',backupUECard())}}
  updateTabs(id);syncFocus();enhanceChoices();
  return r;
 };
