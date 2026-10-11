@@ -357,6 +357,14 @@ body.v19-big .v19q-grid{grid-template-columns:1fr}
 .v19x-opt input{width:22px;height:22px;min-height:0;margin-top:2px;accent-color:var(--accent)}
 .v19x-opt:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
 
+.v19x-list{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin-top:4px}
+.v19x-list summary{cursor:pointer;min-height:32px;display:flex;align-items:center;font-size:15px}
+.v19x-rows{max-height:260px;overflow:auto;margin-top:8px;-webkit-overflow-scrolling:touch}
+.v19x-row{display:flex;align-items:center;gap:10px;padding:8px 2px;border-top:1px solid #E7ECEA;margin:0}
+.v19x-row input{width:22px;height:22px;min-height:0;accent-color:var(--accent);flex-shrink:0}
+.v19x-row .nm{flex:1;font-size:15px}
+.v19x-row .ct{font-size:13px;color:var(--muted);white-space:nowrap}
+
 </style></head><body>
 <header><b>🩺 QCM Médecine <span class="small" style="color:#9ca3af">v19</span></b>
 <nav>
@@ -6809,7 +6817,7 @@ window.v19More=function(){
    </div>
    <div><button type="button" class="primary" onclick="v19SaveCfg()">Enregistrer</button></div>
   </div>
-  <p class="small" style="margin:10px 4px 0">QCM Médecine v19.7 · ${db.records.length} QCM · données enregistrées sur cet appareil.</p>`;
+  <p class="small" style="margin:10px 4px 0">QCM Médecine v19.8 · ${db.records.length} QCM · données enregistrées sur cet appareil.</p>`;
  sh.classList.add('show');
 };
 window.v19CloseMore=function(){const sh=$('v19sheet');if(sh)sh.classList.remove('show')};
@@ -7381,7 +7389,8 @@ window.v19GoChapters=function(){show('review');setTimeout(()=>{const c=$('v19cha
 /* ---------- Exporter toutes les annales d'une UE ---------- */
 window.__ueFilter=function(opts){
  const ue=opts.ue;
- const records=db.records.filter(q=>ueOf(q)===ue);
+ const only=Array.isArray(opts.sources)?new Set(opts.sources):null;
+ const records=db.records.filter(q=>ueOf(q)===ue&&(!only||only.has(q.source)));
  const ids=new Set(records.map(q=>q.id));
  const sources=new Set(records.map(q=>q.source).filter(Boolean));
  const np=s=>(typeof normPdf==='function'?normPdf(s):String(s||'').toLowerCase());
@@ -7390,30 +7399,61 @@ window.__ueFilter=function(opts){
  const prog={};if(withProgress)for(const id of ids)if(progress[id])prog[id]=progress[id];
  const exs=withProgress?(typeof exams!=='undefined'?exams:[]).filter(e=>sources.has(e.source)||String(e.source||'').includes(' · '+ue+' · ')):[];
  const annexes=(db.annexes||[]).filter(a=>sources.has(a.source));
- const label=`${ueCode(ue)} ${ueName(ue)}`.trim();
+ const label=`${ueCode(ue)} ${ueName(ue)}`.trim()+(opts.suffix?` (${opts.suffix})`:'');
  return {ue,label,slug:label.replace(/[^a-z0-9]+/gi,'-').replace(/^-+|-+$/g,'').toLowerCase(),records,ids,sources,
   pdf:k=>pdfNames.has(np(k)),progress:prog,exams:exs,annexes,annexeIds:new Set(annexes.map(a=>a.id)),withProgress};
 };
+// Annales d'une UE : année universitaire (la plus récente des QCM), QCM de cette UE seulement.
+function ueAnnales(ue){
+ const m=new Map();
+ for(const q of db.records){if(ueOf(q)!==ue||!q.source)continue;
+  const a=m.get(q.source)||{source:q.source,n:0,years:new Set()};a.n++;const y=yearOf(q);if(y)a.years.add(String(y));m.set(q.source,a)}
+ return [...m.values()].map(a=>{const ys=[...a.years].sort();const y=ys[ys.length-1]||'';return {source:a.source,n:a.n,year:y,y0:parseInt(y.slice(0,4))||0}})
+  .sort((a,b)=>b.y0-a.y0||a.source.localeCompare(b.source,'fr'));
+}
+window.__v19x=window.__v19x||null;
 window.v19ExportUE=function(ue){
  const ues=ueList();ue=ues.includes(ue)?ue:ues[0];
- const F=window.__ueFilter({ue,withProgress:true});
+ const list=ueAnnales(ue);
+ let st=window.__v19x;
+ if(!st||st.ue!==ue)st=window.__v19x={ue,kind:2,prog:true,from:'',sel:new Set(list.map(a=>a.source))};
+ const years=[...new Set(list.map(a=>a.year).filter(Boolean))].sort();
+ const sel=list.filter(a=>st.sel.has(a.source));
+ const nQ=sel.reduce((s,a)=>s+a.n,0);
  showModalV19(`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><h2 style="margin:0">Exporter une UE</h2>
-  <button type="button" class="v19-round" aria-label="Fermer" onclick="closeModal()">${I.x}</button></div>
-  <label>UE<select id="v19xUE" style="width:100%" onchange="v19ExportUE(this.value)">${ues.map(u=>`<option value="${esc(u)}"${u===ue?' selected':''}>${esc(u)}</option>`).join('')}</select></label>
-  <p class="small" style="margin:4px 0 12px"><b>${F.sources.size} annale(s)</b> · ${F.records.length} QCM. Seuls les QCM de cette UE sont exportés.</p>
-  <div class="v19x-opts" role="radiogroup" aria-label="Contenu">
-   <label class="v19x-opt"><input type="radio" name="v19xKind" value="0"><span><b>Légère</b><br><span class="small">QCM, réponses et corrections. Le plus petit fichier.</span></span></label>
-   <label class="v19x-opt"><input type="radio" name="v19xKind" value="1"><span><b>Complète</b><br><span class="small">+ images des pages, figures, explications et annexes.</span></span></label>
-   <label class="v19x-opt"><input type="radio" name="v19xKind" value="2" checked><span><b>Intégrale</b><br><span class="small">+ PDF des annales et de leurs corrigés. Pour tout retrouver sur un autre appareil.</span></span></label>
+  <button type="button" class="v19-round" aria-label="Fermer" onclick="window.__v19x=null;closeModal()">${I.x}</button></div>
+  <div class="editgrid">
+   <label>UE<select id="v19xUE" style="width:100%" onchange="window.__v19x=null;v19ExportUE(this.value)">${ues.map(u=>`<option value="${esc(u)}"${u===ue?' selected':''}>${esc(u)}</option>`).join('')}</select></label>
+   <label>Annales à partir de<select id="v19xFrom" style="width:100%" onchange="v19xFrom(this.value)"><option value="">Toutes les années</option>${years.map(y=>`<option value="${esc(y)}"${st.from===y?' selected':''}>${esc(y)}</option>`).join('')}</select></label>
   </div>
-  <label style="display:flex;gap:10px;align-items:center;margin:12px 0"><input type="checkbox" id="v19xProg" checked style="width:22px;height:22px;min-height:0"> Inclure ma progression (révisions, carnet d'erreurs, concours blancs)</label>
+  <details class="v19x-list"${st.from?' open':''}><summary><b>${sel.length} annale(s) sur ${list.length}</b> · ${nQ} QCM — toucher pour choisir une par une</summary>
+   <div class="v19x-rows">${list.map((a,i)=>`<label class="v19x-row"><input type="checkbox"${st.sel.has(a.source)?' checked':''} onchange="v19xToggle(${i},this.checked)"><span class="nm">${esc(a.source)}</span><span class="ct">${esc(a.year||'année ?')} · ${a.n} QCM</span></label>`).join('')}</div>
+   <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="secondary" onclick="v19xAll(true)">Tout cocher</button><button type="button" class="secondary" onclick="v19xAll(false)">Tout décocher</button></div>
+  </details>
+  <p class="small" style="margin:8px 0 12px">Seuls les QCM de cette UE sont exportés.</p>
+  <div class="v19x-opts" role="radiogroup" aria-label="Contenu">
+   ${[['0','Légère','QCM, réponses et corrections. Le plus petit fichier.'],['1','Complète','+ images des pages, figures, explications et annexes.'],['2','Intégrale','+ PDF des annales et de leurs corrigés. Pour tout retrouver sur un autre appareil.']]
+     .map(([v,t,d])=>`<label class="v19x-opt"><input type="radio" name="v19xKind" value="${v}"${String(st.kind)===v?' checked':''} onchange="window.__v19x.kind=${v}"><span><b>${t}</b><br><span class="small">${d}</span></span></label>`).join('')}
+  </div>
+  <label style="display:flex;gap:10px;align-items:center;margin:12px 0"><input type="checkbox" id="v19xProg"${st.prog?' checked':''} onchange="window.__v19x.prog=this.checked" style="width:22px;height:22px;min-height:0"> Inclure ma progression (révisions, carnet d'erreurs, concours blancs)</label>
   <p class="small" style="margin:0 0 12px">Décoche pour partager les annales à quelqu'un d'autre : il démarrera avec une progression vierge.</p>
-  <button type="button" class="primary" style="width:100%;min-height:52px" onclick="v19ExportUEGo()">Préparer l'export</button>`);
+  <button type="button" class="primary" style="width:100%;min-height:52px" onclick="v19ExportUEGo()"${sel.length?'':' disabled'}>Préparer l'export (${sel.length} annale${sel.length>1?'s':''}, ${nQ} QCM)</button>`);
 };
+window.v19xFrom=function(y){
+ const st=window.__v19x;if(!st)return;st.from=y;
+ const list=ueAnnales(st.ue);const y0=parseInt(String(y).slice(0,4))||0;
+ st.sel=new Set(list.filter(a=>!y||a.y0>=y0).map(a=>a.source));
+ v19ExportUE(st.ue);
+};
+window.v19xToggle=function(i,on){const st=window.__v19x;const a=ueAnnales(st.ue)[i];if(!a)return;if(on)st.sel.add(a.source);else st.sel.delete(a.source);st.from='';v19ExportUE(st.ue)};
+window.v19xAll=function(on){const st=window.__v19x;st.from='';st.sel=on?new Set(ueAnnales(st.ue).map(a=>a.source)):new Set();v19ExportUE(st.ue)};
 window.v19ExportUEGo=function(){
- const ue=$('v19xUE')?.value;const k=Number((document.querySelector('input[name=v19xKind]:checked')||{}).value||2);
- const withProgress=!!$('v19xProg')?.checked;
- exportBackup(k>=1,k>=2,{ue,withProgress});
+ const st=window.__v19x;if(!st)return;
+ const list=ueAnnales(st.ue),all=st.sel.size===list.length;
+ const opts={ue:st.ue,withProgress:!!st.prog};
+ if(!all){opts.sources=[...st.sel];opts.suffix=st.from?`depuis ${st.from}`:`${st.sel.size} annales`}
+ window.__v19x=null;
+ exportBackup(st.kind>=1,st.kind>=2,opts);
 };
 function backupUECard(){
  const ues=ueList();if(!ues.length)return '';
