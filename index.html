@@ -3243,7 +3243,8 @@ function renderAnnalesByUE(){
          <b style="flex:1">${esc(a.source)}</b>
          <span class="badge b-info">${esc(annee)}</span>
          <span class="badge">${a.n} QCM</span>
-         <button class="secondary" style="padding:2px 8px;font-size:.85em" onclick="event.stopPropagation();exportAnnaleParIndex(${idx})" title="Exporter uniquement cette annale (QCM, images, PDF sujet)">📤 Exporter</button>
+         <button class="secondary" style="padding:2px 8px;font-size:.85em" onclick="event.stopPropagation();v19ReplayAnnaleIdx(${idx})" title="Repasser toute l'annale en concours blanc, sans modifier le planning de révision">🔁 Refaire</button>
+          <button class="secondary" style="padding:2px 8px;font-size:.85em" onclick="event.stopPropagation();exportAnnaleParIndex(${idx})" title="Exporter uniquement cette annale (QCM, images, PDF sujet)">📤 Exporter</button>
        </div>${detail}</div>`;
    }).join('');
    return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0">${esc(ue)} <span class="small">— ${annales.length} annale(s), ${totalQ} QCM</span></h3>${ue!=='—'?`<button class="primary" onclick="v19ExportUE(${JSON.stringify(ue).replace(/"/g,'&quot;')})">📤 Exporter toute l'UE</button>`:''}</div>${lignes}</div>`;
@@ -3479,7 +3480,7 @@ function renderExamSetup(){
   <select id="examSource" style="width:100%">${list.map(e=>`<option value="${esc(e.source)}">${esc(e.source)} — ${e.ready} QCM${e.ready<e.total?` (sur ${e.total}, ${e.total-e.ready} sans correction)`:''}${e.year?' · '+esc(e.year):''}</option>`).join('')}</select></label>
  <label>Durée indicative <select id="examLimit" style="width:100%">
    <option value="0">Sans limite</option><option value="60">1 h</option><option value="90">1 h 30</option><option value="120">2 h</option><option value="180">3 h</option></select></label>
- <label><input type="checkbox" id="examSchedule" checked> Enregistrer les résultats dans le calendrier de révision</label>
+ <label><input type="checkbox" id="examSchedule"> Enregistrer les résultats dans le calendrier de révision <span class="small">(décoché : entraînement libre, ton planning ne bouge pas)</span></label>
  <button class="primary" onclick="startExam()">🏁 Commencer le concours</button>
  <p class="small">Pendant l'épreuve : <span class="kbd">A</span>–<span class="kbd">E</span> pour cocher, <span class="kbd">←</span> <span class="kbd">→</span> pour naviguer, <span class="kbd">M</span> pour marquer une question à revoir.</p>
  ${exams.length?`<p class="small">${exams.length} concours déjà passé(s) — historique dans l'onglet 📈 Statistiques.</p>`:''}</div>`;
@@ -3553,7 +3554,7 @@ function renderExamCard(){
  const letters=optLetters(q);
  area.innerHTML=`<div class="card">
  <div class="small" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center">
-  <span><b>🏁 ${esc(session.source)}</b> · QCM ${session.idx+1}/${session.queue.length} · ${answered} répondu(s) · ${session.flags.size} marqué(s)</span>
+  <span><b>🏁 ${esc(session.source)}</b>${session.withSchedule?'':' <span class="badge b-blue">entraînement · planning non modifié</span>'} · QCM ${session.idx+1}/${session.queue.length} · ${answered} répondu(s) · ${session.flags.size} marqué(s)</span>
   <span id="examClock">${examClockText()}</span></div>
  <div class="progress" style="margin-top:8px"><div style="width:${Math.round(answered/session.queue.length*100)}%"></div></div>
  <div style="display:flex;flex-wrap:wrap;gap:4px;margin:8px 0">
@@ -6817,7 +6818,7 @@ window.v19More=function(){
    </div>
    <div><button type="button" class="primary" onclick="v19SaveCfg()">Enregistrer</button></div>
   </div>
-  <p class="small" style="margin:10px 4px 0">QCM Médecine v19.8 · ${db.records.length} QCM · données enregistrées sur cet appareil.</p>`;
+  <p class="small" style="margin:10px 4px 0">QCM Médecine v19.11 · ${db.records.length} QCM · données enregistrées sur cet appareil.</p>`;
  sh.classList.add('show');
 };
 window.v19CloseMore=function(){const sh=$('v19sheet');if(sh)sh.classList.remove('show')};
@@ -7461,6 +7462,63 @@ function backupUECard(){
   <p class="small">Toutes les annales d'une seule UE, dans un fichier à part : pratique pour garder une copie par UE ou pour partager une UE. À la restauration, le fichier est fusionné, les autres UE ne bougent pas.</p>
   <div style="display:flex;gap:8px;flex-wrap:wrap">${ues.map(u=>`<button type="button" class="secondary" onclick="v19ExportUE(${J(u)})">📤 ${esc(ueCode(u))} ${esc(ueName(u))}</button>`).join('')}</div></div>`;
 }
+
+/* ---------- Refaire sans toucher au planning ---------- */
+// Concours blanc libre : aucune réponse n'est enregistrée dans le calendrier ni dans le carnet d'erreurs.
+window.v19ReplayQueue=function(ids,label){
+ ids=ids.filter(id=>{const q=findRecord(id);return q&&normalizeAnswer(q.answer).length});
+ if(!ids.length){alert('Aucun QCM de cette sélection n\'a de réponse enregistrée : impossible de le corriger en concours blanc. Ajoute le corrigé de l\'annale pour pouvoir la refaire.');return}
+ if(typeof loadExamState==='function'&&loadExamState()&&!confirm('Un concours blanc est déjà en pause. Le remplacer ?'))return;
+ closeModal();
+ session={exam:true,source:label,queue:ids,idx:0,answers:{},flags:new Set(),startedAt:Date.now(),limitMin:0,withSchedule:false,finished:false,results:[]};
+ try{saveExamState();startExamTimer()}catch(e){}
+ show('review');
+};
+function annaleIds(source,ue){
+ return db.records.filter(q=>q.source===source&&(!ue||ueOf(q)===ue)&&normalizeAnswer(q.answer).length)
+  .sort((a,b)=>(deriveNumber(a)||0)-(deriveNumber(b)||0)).map(q=>q.id);
+}
+window.v19ReplayAnnale=function(source,ue){v19ReplayQueue(annaleIds(source,ue),source)};
+window.v19ReplayAnnaleIdx=function(idx){
+ const a=(window.__annalesUE||[])[idx];if(!a){alert('Annale introuvable.');return}
+ const ues=a.ues&&a.ues.size?[...a.ues]:[];
+ v19ReplayAnnale(a.source,ues.length===1?ues[0]:null);
+};
+// « Aucun QCM ne correspond » : explication + choix quand tout est déjà programmé plus tard
+function whenTxt(q){
+ const p=progress[q.id];if(!p||!p.due)return 'jamais vu';
+ const d=Math.round((startOfDay(p.due)-startOfDay(Date.now()))/86400000);
+ return d<=0?'aujourd\'hui':d===1?'demain':`dans ${d} jours`;
+}
+const _startSessionV19=window.startSession;
+window.startSession=function(){
+ const v=id=>document.getElementById(id)?.value;
+ const mode=v('sessMode')||'due';
+ if(mode==='due'){
+  const ue=v('sessUE')||'all',annale=v('sessAnnale')||'all',year=v('sessYear')||'all',notion=v('sessNotion')||'all';
+  const filt=q=>(ue==='all'||ueOf(q)===ue)&&(year==='all'||yearOf(q)===year)&&(annale==='all'||q.source===annale)&&(notion==='all'||notionOfQ(q)===notion);
+  const due=reviewPools().due.filter(filt);
+  const any=reviewPools().all.filter(q=>filt(q)&&normalizeAnswer(q.answer).length);
+  if(!due.length&&any.length&&(ue!=='all'||annale!=='all'||year!=='all'||notion!=='all')){
+   const g={};any.forEach(q=>{const w=whenTxt(q);g[w]=(g[w]||0)+1});
+   const order=w=>w==='demain'?1:(parseInt(w.replace(/\D+/g,''))||999);
+   const dist=Object.entries(g).sort((a,b)=>order(a[0])-order(b[0])).map(([w,n])=>`${n} ${w}`).join(' · ');
+   const what=annale!=='all'?'cette annale':notion!=='all'?'ce chapitre':year!=='all'?'cette année':'cette UE';
+   const label=annale!=='all'?annale:`Entraînement · ${[ue!=='all'?ueName(ue):'',notion!=='all'?notion:'',year!=='all'?year:''].filter(Boolean).join(' · ')}`;
+   const ids=(annale!=='all'?any.slice().sort((a,b)=>(deriveNumber(a)||0)-(deriveNumber(b)||0)):any).map(q=>q.id);
+   window.__v19replay={ids,label};
+   showModalV19(`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px"><h2 style="margin:0">Rien à réviser aujourd'hui dans ${what}</h2>
+    <button type="button" class="v19-round" aria-label="Fermer" onclick="closeModal()">${I.x}</button></div>
+    <p>Tu as déjà travaillé ses ${any.length} QCM. Ils sont programmés plus tard :<br><b>${esc(dist)}</b>.</p>
+    <p class="small">C'est la révision espacée : chaque QCM revient au moment où tu risques de l'oublier.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
+     <button type="button" class="primary" style="min-height:56px;text-align:left;padding:10px 16px" onclick="v19ReplayQueue(window.__v19replay.ids,window.__v19replay.label)"><b>Refaire en concours blanc</b><br><span style="font-weight:400;font-size:14px">Tout d'un bloc avec une note à la fin, sans modifier ton planning.</span></button>
+     <button type="button" class="secondary" onclick="closeModal()">Annuler</button></div>`);
+   return;
+  }
+ }
+ return _startSessionV19.apply(this,arguments);
+};
 
 /* ---------- Navigation ---------- */
 const _show=window.show;
